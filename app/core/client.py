@@ -11,12 +11,11 @@ async def init_gateway_client(app: FastAPI):
     """
     settings = get_settings()
     gateway_client = httpx.AsyncClient(
-        base_url=settings.GATEWAY_URL,
-        headers={"X-API-KEY": settings.GATEWAY_API_KEY},
-        timeout=30.0
+        base_url=settings.BASE_URL,
+        timeout=settings.TIMEOUT
     )
     app.state.gateway_client = gateway_client
-    logger.info(f"Gateway client initialized for base_url: {settings.GATEWAY_URL}")
+    logger.info(f"Gateway client initialized for base_url: {settings.BASE_URL}")
 
 
 async def shutdown_gateway_client(app: FastAPI):

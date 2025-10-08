@@ -1,24 +1,40 @@
 <!DOCTYPE html>
 <html lang="ru">
-
 <head>
     <meta charset="UTF-8">
-    <title>Загрузка файла</title>
+    <title>Обработка данных</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
-
 <body>
     <div class="container">
-        <h1>Простая загрузка файла</h1>
-        <p>Выберите файл, и он будет отправлен на сервер и сразу же вернется для скачивания.</p>
-        <div class="upload-box">
-            <input type="file" id="fileInput">
-            <button id="uploadButton">Загрузить и скачать</button>
+        <h1>Обработка данных</h1>
+        <p>Загрузите .xlsx файл для запуска процесса.</p>
+
+        <!-- Область загрузки -->
+        <div id="upload-area">
+            <input type="file" id="fileInput" accept=".xlsx">
+            <button id="uploadButton">Загрузить и обработать</button>
         </div>
 
-        <p id="status" class="status"></p>
-    </div>
-<script src="/static/script.js"></script>
-</body>
+        <!-- Область прогресса (изначально скрыта) -->
+        <div id="progress-area" class="hidden">
+            <p id="status-text">Идет обработка...</p>
+            <p id="status-detail" class="status-detail"></p>
+            <progress id="progress-bar" value="0" max="100"></progress>
+        </div>
 
+        <!-- Область результата (изначально скрыта) -->
+        <div id="result-area" class="hidden">
+            <p>Обработка завершена!</p>
+            <a id="download-link" class="button-download" href="#">Скачать отчет</a>
+        </div>
+
+        <!-- Область ошибки (изначально скрыта) -->
+        <div id="error-area" class="hidden">
+            <p id="error-text">Произошла ошибка.</p>
+            <button onclick="window.location.reload()">Попробовать снова</button>
+        </div>
+    </div>
+    <script src="/static/script.js"></script>
+</body>
 </html>

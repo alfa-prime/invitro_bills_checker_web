@@ -7,10 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core import init_gateway_client, shutdown_gateway_client, global_exception_handler
 from app.route import health_router
-from app.route import upload_router
+from app.route import processing_router
 
 tags_metadata = []
-
 
 
 @asynccontextmanager
@@ -37,7 +36,7 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
-app.include_router(upload_router)
+app.include_router(processing_router)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

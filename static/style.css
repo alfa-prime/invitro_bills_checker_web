@@ -4,48 +4,65 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
-    margin: 0;
+    height: 100vh; margin: 0;
 }
 
 .container {
     background: white;
     padding: 30px;
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     text-align: center;
     width: 90%;
     max-width: 500px;
 }
 
-.upload-box {
-    margin: 20px 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 15px;
+#upload-area, #progress-area, #result-area, #error-area {
+    margin-top: 20px;
+}
+
+.hidden {
+    display: none;
 }
 
 input[type="file"] {
     border: 1px solid #ccc;
     padding: 10px;
     border-radius: 5px;
+    width: calc(100% - 22px);
+    margin-bottom: 10px;
+}
+
+button, .button-download {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    text-decoration: none;
+    display: inline-block;
+}
+
+button:hover, .button-download:hover {
+    background-color: #0056b3;
+}
+
+progress {
     width: 100%;
+    height: 10px;
+    margin-top: 10px;
 }
-button {
-background-color: #007bff;
-color: white;
-border: none;
-padding: 10px 20px;
-border-radius: 5px;
-cursor: pointer;
-font-size: 16px;
+
+#status-text, #error-text {
+    color: #555;
 }
-button:hover {
-background-color: #0056b3;
-}
-.status {
-margin-top: 15px;
-color: #555;
-min-height: 20px;
+
+.status-detail {
+    color: #555;
+    font-size: 0.9em;
+    min-height: 1.2em; /* Резервируем место, чтобы интерфейс не "прыгал" */
+    margin-top: -5px;
+    margin-bottom: 10px;
 }

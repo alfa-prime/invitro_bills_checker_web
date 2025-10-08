@@ -1,57 +1,106 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Получаем все нужные элементы со страницы
     const fileInput = document.getElementById('fileInput');
     const uploadButton = document.getElementById('uploadButton');
-    const status = document.getElementById('status');
+    const uploadArea = document.getElementById('upload-area');
+    const progressArea = document.getElementById('progress-area');
+    const resultArea = document.getElementById('result-area');
+    const errorArea = document.getElementById('error-area');
+    const statusText = document.getElementById('status-text');
+    const statusDetail = document.getElementById('status-detail');
+    const progressBar = document.getElementById('progress-bar');
+    const downloadLink = document.getElementById('download-link');
+    const errorText = document.getElementById('error-text');
 
-    uploadButton.addEventListener('click', async () => {
-        // Проверяем длину списка файлов
+    uploadButton.addEventListener('click', handleUpload);
+
+    async function handleUpload() {
         if (fileInput.files.length === 0) {
-            status.textContent = 'Пожалуйста, выберите файл.';
+            alert('Пожалуйста, выберите файл.');
             return;
         }
-
-        // Берем первый файл из списка (files[0])
         const file = fileInput.files[0];
 
-        status.textContent = `Загрузка файла: ${file.name}...`;
+        showArea('progress');
+        statusText.textContent = 'Загрузка файла на сервер...';
+        statusDetail.textContent = ''; // Очищаем детали
+        progressBar.value = 0;
 
         const formData = new FormData();
-        // Добавляем сам файл, а не список
         formData.append('file', file);
 
         try {
-            const response = await fetch('/api/upload/', {
+            const response = await fetch('/api/processing/upload', {
                 method: 'POST',
                 body: formData,
             });
+            if (!response.ok) throw new Error('Ошибка при загрузке файла.');
+            const result = await response.json();
+            connectWebSocket(result.task_id);
+        } catch (error) {
+            showError(error.message);
+        }
+    }
 
-            if (!response.ok) {
-                // Попытаемся получить текст ошибки от сервера для лучшей диагностики
-                const errorText = await response.text();
-                console.error("Server response:", errorText);
-                throw new Error('Ошибка сервера при загрузке файла.');
+    function connectWebSocket(taskId) {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}/api/processing/ws/${taskId}`;
+        const ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+            statusText.textContent = 'Соединение установлено, ожидание обработки...';
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+
+            // ИСПРАВЛЕННАЯ ЛОГИКА ОБРАБОТКИ СООБЩЕНИЙ
+
+            // Сначала обработаем особые случаи (ошибка или завершение)
+            if (data.progress === -1) {
+                showError(data.message);
+                ws.close();
+                return; // Выходим из функции
             }
 
-            status.textContent = 'Файл получен! Начинаю скачивание...';
+            if (data.progress === 100) {
+                console.log("Получено сообщение о завершении:", data);
+                downloadLink.href = data.download_url;
+                showArea('result'); // Переключаем интерфейс на результат
+                ws.close();
+                return; // Выходим из функции
+            }
 
-            const blob = await response.blob();
-            const downloadUrl = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = downloadUrl;
-            a.download = file.name;
-            document.body.appendChild(a);
+            // Если это обычное сообщение о прогрессе, обновляем UI
+            progressBar.value = data.progress;
+            if (data.message) {
+                statusText.textContent = data.message;
+            }
+            if (data.detail) {
+                statusDetail.textContent = data.detail;
+            } else {
+                statusDetail.textContent = '';
+            }
+        };
 
-            a.click();
+        ws.onerror = () => {
+            showError('Произошла ошибка WebSocket соединения.');
+        };
+    }
 
-            window.URL.revokeObjectURL(downloadUrl);
-            a.remove();
+    function showArea(areaName) {
+        uploadArea.classList.add('hidden');
+        progressArea.classList.add('hidden');
+        resultArea.classList.add('hidden');
+        errorArea.classList.add('hidden');
 
-            status.textContent = 'Файл успешно скачан!';
+        if (areaName === 'progress') progressArea.classList.remove('hidden');
+        if (areaName === 'result') resultArea.classList.remove('hidden');
+        if (areaName === 'error') errorArea.classList.remove('hidden');
+    }
 
-        } catch (error) {
-            console.error('Ошибка:', error);
-            status.textContent = 'Произошла ошибка при загрузке файла.';
-        }
-    });
+    function showError(message) {
+        errorText.textContent = message;
+        showArea('error');
+    }
 });

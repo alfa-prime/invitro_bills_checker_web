@@ -2,9 +2,13 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    GATEWAY_URL: str
-    GATEWAY_API_KEY: str
-    GATEWAY_REQUEST_ENDPOINT: str
+    BASE_URL: str
+    TIMEOUT: float
+    HEADER_ORIGIN: str
+    HEADER_REFERER: str
+    API_KEY: str
+    START_ROW: int
+    MAX_COL: int
 
     LOGS_LEVEL: str = "INFO"
 
