@@ -11,11 +11,14 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.websocket_manager import manager
 from app.core.config import get_settings
-from app.core import get_http_client
+from app.core import get_base_http_client
 
 from app.service.processing.getter import get_raw_data, get_ids
 from app.service.processing.sanitizer import sanitize_raw_data
 from app.service.processing.tool import separate_records, doubles_and_not_found, save_json
+
+from app.core import get_gateway_service
+from app.service.gateway import GatewayService
 
 router = APIRouter(prefix="/api/processing", tags=["Data Processing"])
 settings = get_settings()
@@ -27,7 +30,7 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-async def run_processing_pipeline(task_id: str, input_path: Path, output_path: Path, client: httpx.AsyncClient):
+async def run_processing_pipeline(task_id: str, input_path: Path, output_path: Path, service: GatewayService):
     """
     pipeline обработки файла.
     """
@@ -45,7 +48,7 @@ async def run_processing_pipeline(task_id: str, input_path: Path, output_path: P
 
         # Шаг 3: Получение ID пациентов (сетевая операция)
         await manager.send_progress(task_id, {"progress": 50, "message": "Запрос ID пациентов из ЕВМИАС..."})
-        persons_ids = await get_ids(client, sanitized_data, task_id=task_id, manager=manager)
+        persons_ids = await get_ids(service, sanitized_data, task_id=task_id, manager=manager)
 
         # Шаг 4: Отделение валидных записей
         await manager.send_progress(task_id, {"progress": 75, "message": "Анализ полученных ID..."})
@@ -70,7 +73,7 @@ async def run_processing_pipeline(task_id: str, input_path: Path, output_path: P
 async def upload_and_process(
         background_tasks: BackgroundTasks,
         file: UploadFile = File(...),
-        client: httpx.AsyncClient = Depends(get_http_client)
+        service: GatewayService = Depends(get_gateway_service)
 ):
     if not file.filename.endswith('.xlsx'):
         raise HTTPException(status_code=400, detail="Неверный формат файла. Требуется .xlsx")
@@ -82,7 +85,7 @@ async def upload_and_process(
     with open(input_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    background_tasks.add_task(run_processing_pipeline, task_id, input_path, output_path, client)
+    background_tasks.add_task(run_processing_pipeline, task_id, input_path, output_path, service)
 
     return {"task_id": task_id}
 

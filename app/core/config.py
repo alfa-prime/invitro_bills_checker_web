@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     BASE_URL: str
+    GATEWAY_REQUEST_ENDPOINT: str
     TIMEOUT: float
     HEADER_ORIGIN: str
     HEADER_REFERER: str
