@@ -40,6 +40,7 @@ RUN echo "deb http://mirror.yandex.ru/debian/ trixie main" > /etc/apt/sources.li
 RUN apt-get update && apt-get install -y --no-install-recommends locales \
  && sed -i '/ru_RU.UTF-8/s/^# //g' /etc/locale.gen \
  && locale-gen ru_RU.UTF-8 \
+ && apt-get install -y micro \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
