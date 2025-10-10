@@ -32,6 +32,8 @@ COPY --from=builder /opt/venv /opt/venv
 
 WORKDIR /code
 COPY ./app /code/app
+COPY ./static /code/static
+COPY ./materials /code/materials
 
 ENV PATH="/opt/venv/bin:$PATH"
 

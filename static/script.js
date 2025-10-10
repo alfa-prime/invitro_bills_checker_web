@@ -22,6 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const file = fileInput.files[0];
 
+        uploadButton.disabled = true;
+        uploadButton.textContent = 'Обработка...';
+
         showArea('progress');
         statusText.textContent = 'Загрузка файла на сервер...';
         statusDetail.textContent = ''; // Очищаем детали
@@ -43,8 +46,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const result = await response.json();
             connectWebSocket(result.task_id);
+
         } catch (error) {
             showError(error.message);
+            resetUploadButton();
         }
     }
 
@@ -91,6 +96,17 @@ document.addEventListener('DOMContentLoaded', () => {
         ws.onerror = () => {
             showError('Произошла ошибка WebSocket соединения.');
         };
+    }
+
+    function resetUI() {
+        fileInput.value = '';
+        resetUploadButton();
+        showArea('upload');
+    }
+
+    function resetUploadButton() {
+        uploadButton.disabled = false;
+        uploadButton.textContent = 'Загрузить и обработать';
     }
 
     async function handleDownload(event) {
@@ -142,8 +158,11 @@ document.addEventListener('DOMContentLoaded', () => {
         a.click(); // Имитируем клик для начала скачивания
 
         // Очищаем временные объекты
-        window.URL.revokeObjectURL(downloadUrl);
         a.remove();
+        window.URL.revokeObjectURL(downloadUrl);
+        resetUI();
+
+
 
     } catch (error) {
         alert(error.message); // Показываем ошибку
@@ -159,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resultArea.classList.add('hidden');
         errorArea.classList.add('hidden');
 
+        if (areaName === 'upload') uploadArea.classList.remove('hidden');
         if (areaName === 'progress') progressArea.classList.remove('hidden');
         if (areaName === 'result') resultArea.classList.remove('hidden');
         if (areaName === 'error') errorArea.classList.remove('hidden');
