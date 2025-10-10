@@ -3,39 +3,65 @@ import datetime as dt
 from datetime import datetime, timedelta
 from dateutil.parser import parse
 
+from . import constants
+from app.service.processing.tool import is_person_id_valid
 from .pay_type_mapper import PAY_TYPE_IDS
 
 
-def sanitize_for_report(data: list) -> list[dict[str,Any]]:
+def sanitize_for_report(data: list) -> list[dict]:
+    """
+    Преобразует сложные вложенные данные в ПЛОСКУЮ структуру,
+    которую ожидает функция `make_report`.
+    """
     result = []
     for row in data:
-        try:
-            test_evmias =  row.get("test_evmias")
-        except Exception:
-            test_evmias = None
+        person = row.get("person", {})
+        test_src = row.get("test_src", {})
+        test_evmias = row.get("test_evmias")
+        test_report = row.get("test_report")
+        person_id = person.get("id")
 
-        try:
-            test_report =  row.get("test_report")
-            test_pay_type = test_report.get("pay_type")
-        except Exception:
-            test_report = None
-            test_pay_type = None
+        # Переменные для финального отчета
+        final_pay_type = ""
+        final_comment = ""
 
+        # Логика определения комментария и типа оплаты
+        if person_id == constants.PERSON_ID_STATUS_NOT_FOUND:
+            final_comment = "Пациент не найден в ЕВМИАС (сверить установочные данные)"
+        elif person_id == constants.PERSON_ID_STATUS_MULTIPLE_FOUND:
+            final_comment = "Найдено несколько пациентов (двойники)"
+        elif person_id == constants.PERSON_ID_STATUS_API_ERROR:
+            final_comment = "Ошибка API при поиске пациента"
+        elif not test_evmias:
+            final_comment = constants.COMMENT_SERVICE_NOT_FOUND.format(test_src.get('code', ''))
+        elif not test_report:
+            final_comment = constants.COMMENT_RESULTS_NOT_FOUND
+        else:
+            final_pay_type = test_report.get("pay_type", "")
 
+        # ИСПРАВЛЕНИЕ: Создаем ПЛОСКИЙ словарь
         result.append({
-            "inz": row["inz"],
-            "visit_date": row["visit_date"],
-            "last_name": row["person"]["last_name"],
-            "first_name": row["person"]["first_name"],
-            "middle_name": row["person"]["middle_name"],
-            "birth_day": row["person"]["birth_day"],
-            "test_code": row["test_src"]["code"],
-            "test_name": row["test_src"]["name"],
-            "test_quantity": row["test_src"]["quantity"],
-            "test_price": row["test_src"]["price"],
-            "test_pay_type": test_pay_type,
-            "test_evmias": test_evmias,
-            "test_report": test_report,
+            # Данные пациента на верхнем уровне
+            'last_name': person.get('last_name', ''),
+            'first_name': person.get('first_name', ''),
+            'middle_name': person.get('middle_name', ''),
+            'birth_day': person.get('birth_day', ''),
+
+            # Остальные данные
+            "visit_date": row.get("visit_date", ""),
+            "inz": row.get("inz", ""),
+            "test_code": test_src.get("code", ""),
+            "test_name": test_src.get("name", ""),
+            "test_quantity": test_src.get("quantity", 0),
+            "test_price": test_src.get("price", 0.0),
+
+            # Результаты анализа
+            'test_pay_type': final_pay_type,  # Используем ключ, который ожидает make_report
+            'comment': final_comment,  # Передаем рассчитанный комментарий
+
+            # Сохраняем оригинальные объекты для make_report, если они нужны
+            'test_evmias': test_evmias,
+            'test_report': test_report
         })
     return result
 
@@ -94,6 +120,10 @@ def _sanitize_history_item(data: list) -> list:
 def sanitize_persons_tests_history(data: list) -> list:
     result = []
     for row in data:
+        person_id = row.get("person", {}).get("id")
+        if not is_person_id_valid(person_id):
+            result.append(row)
+            continue
         test_history = row.get("tests_history")
         sanitize_history = _sanitize_history_item(test_history)
         try:

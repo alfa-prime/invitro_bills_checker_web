@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const downloadLink = document.getElementById('download-link');
     const errorText = document.getElementById('error-text');
 
+    downloadLink.addEventListener('click', handleDownload);
     uploadButton.addEventListener('click', handleUpload);
 
     async function handleUpload() {
@@ -32,9 +33,14 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('/api/processing/upload', {
                 method: 'POST',
+                headers: {
+                    'X-API-KEY': 'lXrhZrd7SNdAdU6lkfUQ1wOJzngWHqsAnWu0DmV9QtM'
+                },
                 body: formData,
             });
+
             if (!response.ok) throw new Error('Ошибка при загрузке файла.');
+
             const result = await response.json();
             connectWebSocket(result.task_id);
         } catch (error) {
@@ -44,7 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function connectWebSocket(taskId) {
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${wsProtocol}//${window.location.host}/api/processing/ws/${taskId}`;
+        const apiKey = 'lXrhZrd7SNdAdU6lkfUQ1wOJzngWHqsAnWu0DmV9QtM';
+        const wsUrl = `${wsProtocol}//${window.location.host}/api/processing/ws/${taskId}?api_key=${apiKey}`;
         const ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
@@ -54,9 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
 
-            // ИСПРАВЛЕННАЯ ЛОГИКА ОБРАБОТКИ СООБЩЕНИЙ
-
-            // Сначала обработаем особые случаи (ошибка или завершение)
             if (data.progress === -1) {
                 showError(data.message);
                 ws.close();
@@ -65,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.progress === 100) {
                 console.log("Получено сообщение о завершении:", data);
-                downloadLink.href = data.download_url;
+                downloadLink.dataset.url = data.download_url;
                 showArea('result'); // Переключаем интерфейс на результат
                 ws.close();
                 return; // Выходим из функции
@@ -87,6 +91,66 @@ document.addEventListener('DOMContentLoaded', () => {
             showError('Произошла ошибка WebSocket соединения.');
         };
     }
+
+    async function handleDownload(event) {
+    // Предотвращаем стандартное поведение ссылки (переход по href)
+    event.preventDefault();
+
+    const url = downloadLink.dataset.url;
+    if (!url) return;
+
+    // Показываем пользователю, что скачивание началось
+    const originalText = downloadLink.textContent;
+    downloadLink.textContent = 'Подготовка файла...';
+
+    try {
+        const apiKey = 'lXrhZrd7SNdAdU6lkfUQ1wOJzngWHqsAnWu0DmV9QtM';
+
+        // Делаем fetch-запрос с правильным заголовком
+        const response = await fetch(url, {
+            headers: { 'X-API-KEY': apiKey }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Ошибка при скачивании файла: ${response.statusText}`);
+        }
+
+        // Получаем имя файла из заголовка Content-Disposition, если оно есть,
+        // или используем имя по умолчанию.
+        const disposition = response.headers.get('content-disposition');
+        let filename = 'report.xlsx';
+        if (disposition && disposition.indexOf('attachment') !== -1) {
+            const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+            const matches = filenameRegex.exec(disposition);
+            if (matches != null && matches[1]) {
+              filename = matches[1].replace(/['"]/g, '');
+            }
+        }
+
+        // Получаем тело ответа как Blob (бинарные данные)
+        const blob = await response.blob();
+
+        // Создаем временную ссылку в памяти для скачивания
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = downloadUrl;
+        a.download = filename; // Устанавливаем имя файла
+        document.body.appendChild(a);
+
+        a.click(); // Имитируем клик для начала скачивания
+
+        // Очищаем временные объекты
+        window.URL.revokeObjectURL(downloadUrl);
+        a.remove();
+
+    } catch (error) {
+        alert(error.message); // Показываем ошибку
+    } finally {
+        // Возвращаем исходный текст кнопки
+        downloadLink.textContent = originalText;
+    }
+}
 
     function showArea(areaName) {
         uploadArea.classList.add('hidden');

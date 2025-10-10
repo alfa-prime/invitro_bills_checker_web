@@ -3,12 +3,13 @@ import shutil
 from pathlib import Path
 from fastapi import (
     APIRouter, UploadFile, File, WebSocket, WebSocketDisconnect,
-    BackgroundTasks, HTTPException, Depends
+    BackgroundTasks, HTTPException, Depends, Query, status
 )
 from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
 from app.core.exceptions import GatewayConnectivityError
+from app.core.dependencies import get_api_key
 from app.core.websocket_manager import manager
 from app.core.config import get_settings
 from app.core.logger_setup import logger
@@ -20,8 +21,17 @@ from app.service.processing.getter import (
     get_person_tests_history,
     get_pay_type, get_medical_history
 )
-from app.service.processing.sanitizer import sanitize_raw_data, sanitize_persons_tests_history, sanitize_for_report
-from app.service.processing.tool import separate_records, doubles_and_not_found, save_json, make_report
+from app.service.processing.sanitizer import (
+    sanitize_raw_data,
+    sanitize_persons_tests_history,
+    sanitize_for_report
+)
+from app.service.processing.tool import (
+    # analyze_person_ids,
+    # doubles_and_not_found,
+    save_json,
+    make_report
+)
 
 from app.service.gateway import GatewayService
 
@@ -48,7 +58,7 @@ async def run_processing_pipeline(task_id: str, input_path: Path, output_path: P
         await run_in_threadpool(save_json, raw_data,
                                 task_results_path / "01.raw_data.json")
 
-        await manager.send_progress(task_id, {"progress": 5, "message": "Подготовка данных..."})
+        await manager.send_progress(task_id, {"progress": 10, "message": "Подготовка данных..."})
         sanitized_data = await run_in_threadpool(sanitize_raw_data, raw_data)
         await run_in_threadpool(save_json, sanitized_data,
                                 task_results_path / "02.sanitized_raw_data.json")
@@ -62,51 +72,42 @@ async def run_processing_pipeline(task_id: str, input_path: Path, output_path: P
         await run_in_threadpool(save_json, persons_ids,
                                 task_results_path / "03.persons_ids.json")
 
-        await manager.send_progress(task_id, {"progress": 20, "message": "Анализ полученных ID..."})
-        valid_records = await run_in_threadpool(separate_records, persons_ids, task_results_path)
-        await run_in_threadpool(save_json, valid_records,
-                                task_results_path / "04.valid_records.json")
-
-        await manager.send_progress(task_id, {"progress": 25, "message": "Сохранение 'не найденных' и 'двойников'..."})
-        await run_in_threadpool(shutil.copy, input_path, output_path)
-        await run_in_threadpool(doubles_and_not_found, output_path, task_results_path)
-
-        await manager.send_progress(task_id, {"progress": 30, "message": "Получение данных об услугах из ЕВМИАС ..."})
+        await manager.send_progress(task_id, {"progress": 20, "message": "Получение данных об услугах из ЕВМИАС ..."})
         test_data_from_evmias = await get_test_data_from_evmias(
-            service, valid_records,
+            service, persons_ids,
             task_id=task_id, manager=manager,
-            start_progress=30, end_progress=40
+            start_progress=20, end_progress=30
         )
         await run_in_threadpool(save_json, test_data_from_evmias,
                                 task_results_path / "05.test_data_from_evmias.json")
 
-        await manager.send_progress(task_id, {"progress": 40, "message": "Запрос истории анализов пациентов..."})
+        await manager.send_progress(task_id, {"progress": 30, "message": "Запрос истории анализов пациентов..."})
         persons_tests_history = await get_person_tests_history(
             service, test_data_from_evmias,
             task_id=task_id, manager=manager,
-            start_progress=40, end_progress=50
+            start_progress=30, end_progress=40
         )
         await run_in_threadpool(save_json, persons_tests_history, task_results_path / "06.persons_tests_history.json")
 
-        await manager.send_progress(task_id, {"progress": 60, "message": "Очистка данных истории анализов..."})
+        await manager.send_progress(task_id, {"progress": 40, "message": "Очистка данных истории анализов..."})
         sanitized_persons_tests_history = await run_in_threadpool(sanitize_persons_tests_history, persons_tests_history)
         await run_in_threadpool(save_json, sanitized_persons_tests_history,
                                 task_results_path / "07.sanitized_persons_tests_history.json")
 
-        await manager.send_progress(task_id, {"progress": 70, "message": "Определение типа оплаты #1..."})
+        await manager.send_progress(task_id, {"progress": 50, "message": "Определение типа оплаты #1..."})
         records_with_pay_type = await get_pay_type(
             service, sanitized_persons_tests_history,
             task_id=task_id, manager=manager,
-            start_progress=70, end_progress=80
+            start_progress=50, end_progress=70
         )
         await run_in_threadpool(save_json, records_with_pay_type,
                                 task_results_path / "08.pay_type_by_tests_history.json")
 
-        await manager.send_progress(task_id, {"progress": 80, "message": "Определение типа оплаты #2..."})
+        await manager.send_progress(task_id, {"progress": 70, "message": "Определение типа оплаты #2..."})
         medical_history = await get_medical_history(
             service, records_with_pay_type,
             task_id=task_id, manager=manager,
-            start_progress=80, end_progress=90
+            start_progress=70, end_progress=90
         )
         await run_in_threadpool(save_json, medical_history,
                                 task_results_path / "09.pay_type_by_medical_history.json")
@@ -116,6 +117,7 @@ async def run_processing_pipeline(task_id: str, input_path: Path, output_path: P
         await run_in_threadpool(save_json, data_for_report,
                                 task_results_path / "10.data_for_report.json")
 
+        await run_in_threadpool(shutil.copy, input_path, output_path)
         await run_in_threadpool(make_report, data_for_report, output_path)
 
         download_url = f"/api/processing/download/{task_id}"
@@ -129,7 +131,7 @@ async def run_processing_pipeline(task_id: str, input_path: Path, output_path: P
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        logger.error(f"ОШИБКА в задаче {task_id}: {e}")
+        logger.error(f"ОШИБКА в задаче {task_id}: {e}, trace: {error_details}")
         await manager.send_progress(task_id, {"progress": -1, "message": f"Произошла критическая ошибка: {e}"})
 
 
@@ -137,7 +139,8 @@ async def run_processing_pipeline(task_id: str, input_path: Path, output_path: P
 async def upload_and_process(
         background_tasks: BackgroundTasks,
         file: UploadFile = File(...),
-        service: GatewayService = Depends(get_gateway_service)
+        service: GatewayService = Depends(get_gateway_service),
+        api_key: str = Depends(get_api_key)
 ):
     if not file.filename.endswith('.xlsx'):
         raise HTTPException(status_code=400, detail="Неверный формат файла. Требуется .xlsx")
@@ -155,7 +158,15 @@ async def upload_and_process(
 
 
 @router.websocket("/ws/{task_id}")
-async def websocket_endpoint(websocket: WebSocket, task_id: str):
+async def websocket_endpoint(
+        websocket: WebSocket,
+        task_id: str,
+        api_key: str = Query(...)
+):
+    if api_key != settings.APP_API_KEY:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
     await manager.connect(websocket, task_id)
     try:
         while True:
@@ -165,7 +176,7 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
 
 
 @router.get("/download/{task_id}", summary="Скачивание обработанного файла")
-async def download_result(task_id: str):
+async def download_result(task_id: str, api_key: str = Depends(get_api_key)):
     file_path = RESULTS_DIR / f"{task_id}_report.xlsx"
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Файл не найден или еще не готов.")

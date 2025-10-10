@@ -5,6 +5,7 @@ from app.service.gateway import GatewayService
 from app.core.config import get_settings
 from app.core.logger_setup import logger
 from . import constants
+from ...core.exceptions import GatewayConnectivityError
 
 settings = get_settings()
 
@@ -28,6 +29,10 @@ async def _fetch_person_id_from_api(
             json=payload,
         )
 
+        if not response_json:
+            logger.error(f"Пустой или некорректный ответ от шлюза для '{last_name}'")
+            return constants.PERSON_ID_STATUS_API_ERROR
+
         if response_json and "totalCount" in response_json:
             count = response_json["totalCount"]
             if count == 1: return response_json["data"][0]["Person_id"]
@@ -36,6 +41,9 @@ async def _fetch_person_id_from_api(
 
         return constants.PERSON_ID_STATUS_NOT_FOUND
 
+    except GatewayConnectivityError as e:
+        logger.error(f"Перехвачена ошибка подключения для '{last_name}': {e}")
+        raise e
     except Exception as e:
         logger.error(f"Ошибка при обработке ответа от шлюза для '{last_name}': {e}")
         return constants.PERSON_ID_STATUS_API_ERROR

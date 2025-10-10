@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     HEADER_ORIGIN: str
     HEADER_REFERER: str
     API_KEY: str
+    APP_API_KEY: str
     START_ROW: int
     MAX_COL: int
 

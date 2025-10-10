@@ -13,7 +13,7 @@ class GatewayService:
     def __init__(self, client: httpx.AsyncClient):
         self._client = client
 
-    async def make_request(self, method: str, **kwargs) -> dict:
+    async def make_request(self, method: str, **kwargs) -> dict | None:
         """
         Выполняет HTTP-запрос к единственному эндпоинту шлюза.
 
@@ -45,15 +45,20 @@ class GatewayService:
             response.raise_for_status()
             return response.json() if response.content else {}
 
+
         except ValueError as exc:
             logger.exception(f"Внутренняя ошибка сервиса: {exc}")
             raise HTTPException(status_code=500, detail=str(exc))
 
-        except (httpx.RequestError, httpx.HTTPStatusError) as exc:
-            if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500:
-                logger.exception(f"Ошибка от шлюза (4xx): {exc.response.text}")
-                raise HTTPException(status_code=exc.response.status_code,
-                                    detail=f"Ошибка от шлюза: {exc.response.text}")
-        logger.error(f"Критическая ошибка подключения к шлюзу: {exc}")
-        raise GatewayConnectivityError("Не удалось подключиться к API-шлюзу ЕВМИАС. Сервис временно недоступен.")
+        except httpx.HTTPStatusError as exc:
+            if 400 <= exc.response.status_code < 500:
+                logger.warning(f"Ошибка от шлюза (4xx): {exc.response.text}")
+                return None
+
+            logger.error(f"Критическая ошибка от шлюза (5xx): {exc}")
+            raise GatewayConnectivityError("API-шлюз ЕВМИАС временно недоступен (ошибка сервера).")
+
+        except httpx.RequestError as exc:
+            logger.error(f"Критическая ошибка подключения к шлюзу: {exc}")
+            raise GatewayConnectivityError("Не удалось подключиться к API-шлюзу ЕВМИАС (ошибка сети).")
 

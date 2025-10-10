@@ -9,27 +9,33 @@ from . import constants
 CENTER_ALIGNED = Alignment(horizontal='center', vertical='center')
 
 
+def is_person_id_valid(person_id):
+    """Вспомогательная функция для проверки валидности ID."""
+    return person_id not in {
+        constants.PERSON_ID_STATUS_NOT_FOUND,
+        constants.PERSON_ID_STATUS_MULTIPLE_FOUND,
+        constants.PERSON_ID_STATUS_API_ERROR
+    }
+
+
 def save_json(data, filename):
     with open(filename, 'w', encoding='utf-8') as file:
         json.dump(data, file, ensure_ascii=False, indent=2)
 
 
-def separate_records(data, results_path: Path):
-    not_found_file = results_path / "not_found_records.json"
-    doubles_file = results_path / "doubles_records.json"
-
-    not_found = [r for r in data if r['person']['id'] == constants.PERSON_ID_STATUS_NOT_FOUND]
-    if not_found: save_json(not_found, not_found_file)
-
-    doubles = [r for r in data if r['person']['id'] == constants.PERSON_ID_STATUS_MULTIPLE_FOUND]
-    if doubles: save_json(doubles, doubles_file)
-
-    invalid = {
-        constants.PERSON_ID_STATUS_NOT_FOUND,
-        constants.PERSON_ID_STATUS_MULTIPLE_FOUND,
-        constants.PERSON_ID_STATUS_API_ERROR
-    }
-    return [r for r in data if r['person']['id'] not in invalid]
+# def analyze_person_ids(data, results_path: Path):
+#     not_found_file = results_path / "not_found_records.json"
+#     doubles_file = results_path / "doubles_records.json"
+#
+#     not_found = [r for r in data if r['person']['id'] == constants.PERSON_ID_STATUS_NOT_FOUND]
+#     if not_found:
+#         save_json(not_found, not_found_file)
+#
+#     doubles = [r for r in data if r['person']['id'] == constants.PERSON_ID_STATUS_MULTIPLE_FOUND]
+#     if doubles:
+#         save_json(doubles, doubles_file)
+#
+#     return data
 
 
 def _align_column_center(sheet: worksheet, columns: list):
@@ -54,89 +60,81 @@ def _auto_cells_width(sheet):
         sheet.column_dimensions[col_letter].width = max_length + 4
 
 
-def doubles_and_not_found(book_path: Path, results_path: Path):
-    process_map = {
-        "Не найдено в ЕВМИАС": results_path / "not_found_records.json",
-        "Двойники": results_path / "doubles_records.json"
-    }
+# def doubles_and_not_found(book_path: Path, results_path: Path):
+#     process_map = {
+#         "Не найдено в ЕВМИАС": results_path / "not_found_records.json",
+#         "Двойники": results_path / "doubles_records.json"
+#     }
+#
+#     book = load_workbook(book_path)
+#
+#     for sheet_name, file_name in process_map.items():
+#         if file_name.is_file():
+#             sheet = book.create_sheet(sheet_name)
+#             sheet.append(["Дата взятия", "ИНЗ", "ФИО", "Дата рождения"])
+#             with open(file_name, "r", encoding="utf-8") as f:
+#                 data = json.load(f)
+#
+#             unique_records = set()
+#             for each in data:
+#                 person = each["person"]
+#                 row_tuple = (
+#                     each["visit_date"],
+#                     each["inz"],
+#                     f"{person['last_name']} {person['first_name']} {person['middle_name']}".strip(),
+#                     person['birth_day']
+#                 )
+#                 unique_records.add(row_tuple)
+#
+#             for record in sorted(list(unique_records)):
+#                 sheet.append(record)
+#
+#             _auto_cells_width(sheet)
+#
+#             rows_to_align = [1]
+#             _align_row_center(sheet, rows_to_align)
+#
+#             columns_to_align = ["A", "B", "D"]
+#             _align_column_center(sheet, columns_to_align)
+#
+#     book.save(book_path)
+#     book.close()
 
-    book = load_workbook(book_path)
 
-    for sheet_name, file_name in process_map.items():
-        if file_name.is_file():
-            sheet = book.create_sheet(sheet_name)
-            sheet.append(["Дата взятия", "ИНЗ", "ФИО", "Дата рождения"])
-            with open(file_name, "r", encoding="utf-8") as f:
-                data = json.load(f)
-
-            unique_records = set()
-            for each in data:
-                person = each["person"]
-                row_tuple = (
-                    each["visit_date"],
-                    each["inz"],
-                    f"{person['last_name']} {person['first_name']} {person['middle_name']}".strip(),
-                    person['birth_day']
-                )
-                unique_records.add(row_tuple)
-
-            for record in sorted(list(unique_records)):
-                sheet.append(record)
-
-            _auto_cells_width(sheet)
-
-            rows_to_align = [1]
-            _align_row_center(sheet, rows_to_align)
-
-            columns_to_align = ["A", "B", "D"]
-            _align_column_center(sheet, columns_to_align)
-
-    book.save(book_path)
-    book.close()
-
-
-def make_report(data, filename):
+def make_report(data: list[dict], filename: str | Path):
     book = load_workbook(filename)
-    # задаем цвет для заливки не валидных строк
-    invalid_fill = PatternFill(start_color="FFFFC7CE", end_color="FFFFC7CE", fill_type="solid")
-
+    if "Для работы" in book.sheetnames:
+        book.remove(book["Для работы"])
     sheet = book.create_sheet("Для работы")
-    sheet.append([
+
+    headers = [
         "Дата взятия", "ИНЗ", "ФИО", "Дата рождения", "Код теста",
         "Название теста", "Кол-во", "Цена", "Оплата", "Комментарий"
-    ])
+    ]
+    sheet.append(headers)
+
+    invalid_fill = PatternFill(start_color="FFFFC7CE", end_color="FFFFC7CE", fill_type="solid")
 
     for each in data:
-        visit_date = each["visit_date"]
-        inz = each["inz"]
-        name = f"{each['last_name']} {each['first_name']} {each['middle_name']}"
-        birthday = each['birth_day']
-        test_code = each['test_code']
-        test_name = each['test_name']
-        test_quantity = each['test_quantity']
-        test_price = each['test_price']
+        name = f"{each.get('last_name', '')} {each.get('first_name', '')} {each.get('middle_name', '')}".strip()
 
-        test_evmias = each['test_evmias']
-        test_report = each['test_report']
+        row_to_append = [
+            each.get("visit_date", ""),
+            each.get("inz", ""),
+            name,
+            each.get("birth_day", ""),
+            each.get("test_code", ""),
+            each.get("test_name", ""),
+            each.get("test_quantity", 0),
+            each.get("test_price", 0.0),
+            each.get("test_pay_type", ""),
+            each.get("comment", ""),
+        ]
+        sheet.append(row_to_append)
 
-        if not test_evmias:
-            test_pay_type = ''
-            comment = constants.COMMENT_SERVICE_NOT_FOUND.format(test_code)
-        elif not test_report:
-            test_pay_type = ''
-            comment = constants.COMMENT_RESULTS_NOT_FOUND
-        else:
-            test_pay_type = each['test_pay_type']
-            comment = ''
-
-        row = [visit_date, inz, name, birthday, test_code, test_name, test_quantity, test_price, test_pay_type, comment]
-        sheet.append(row)
-
-        # Проверяем условие и подкрашиваем строку с невалидными данными по оплате
-        if comment:
-            # Получаем номер только что добавленной строки
+        # Красим строку, если есть комментарий
+        if each.get("comment"):
             current_row = sheet.max_row
-            # Применяем заливку ко всем ячейкам в этой строке
             for cell in sheet[current_row]:
                 cell.fill = invalid_fill
 
