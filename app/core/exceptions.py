@@ -20,3 +20,11 @@ async def global_exception_handler(request: Request, exc: Exception):
             }
         },
     )
+
+
+class GatewayConnectivityError(Exception):
+    """
+    Специальное исключение, которое будет вызываться,
+    когда GatewayService не может подключиться к шлюзу.
+    """
+    pass

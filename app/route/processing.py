@@ -8,9 +8,11 @@ from fastapi import (
 from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
+from app.core.exceptions import GatewayConnectivityError
 from app.core.websocket_manager import manager
 from app.core.config import get_settings
-
+from app.core.logger_setup import logger
+from app.core import get_gateway_service
 from app.service.processing.getter import (
     get_raw_data,
     get_ids,
@@ -21,7 +23,6 @@ from app.service.processing.getter import (
 from app.service.processing.sanitizer import sanitize_raw_data, sanitize_persons_tests_history, sanitize_for_report
 from app.service.processing.tool import separate_records, doubles_and_not_found, save_json, make_report
 
-from app.core import get_gateway_service
 from app.service.gateway import GatewayService
 
 router = APIRouter(prefix="/api/processing", tags=["Data Processing"])
@@ -122,8 +123,13 @@ async def run_processing_pipeline(task_id: str, input_path: Path, output_path: P
             "progress": 100, "message": "Отчет готов к скачиванию!", "download_url": download_url
         })
 
+    except GatewayConnectivityError as e:
+        await manager.send_progress(task_id, {"progress": -1, "message": str(e)})
+
     except Exception as e:
-        print(f"ОШИБКА в задаче {task_id}: {e}")
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"ОШИБКА в задаче {task_id}: {e}")
         await manager.send_progress(task_id, {"progress": -1, "message": f"Произошла критическая ошибка: {e}"})
 
 
