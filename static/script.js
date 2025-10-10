@@ -54,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const wsUrl = `${wsProtocol}//${window.location.host}/api/processing/ws/${taskId}?api_key=${apiKey}`;
         const ws = new WebSocket(wsUrl);
 
+
         ws.onopen = () => {
             statusText.textContent = 'Соединение установлено, ожидание обработки...';
         };
