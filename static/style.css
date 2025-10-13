@@ -14,7 +14,7 @@ body {
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     text-align: center;
     width: 90%;
-    max-width: 500px;
+    max-width: 800px;
 }
 
 #upload-area, #progress-area, #result-area, #error-area {
@@ -65,4 +65,52 @@ progress {
     min-height: 1.2em; /* Резервируем место, чтобы интерфейс не "прыгал" */
     margin-top: -5px;
     margin-bottom: 10px;
+}
+
+.info-box {
+    /* ИЗМЕНЕНИЕ: Цвет фона на бледно-голубой */
+    background-color: #e7f5fe;
+
+    /* ИЗМЕНЕНИЕ: Цвет полоски слева на синий, в тон кнопке */
+    border-left: 4px solid #3498db;
+
+    padding: 15px 20px; /* Добавим чуть больше отступа по бокам */
+    margin: 25px 0;
+    border-radius: 5px;
+
+    /* ИЗМЕНЕНИЕ: Выравниваем весь текст в блоке по левому краю */
+    text-align: left;
+
+    font-size: 0.9em;
+    color: #34495e; /* Чуть темнее текст для контраста */
+}
+
+.info-box p {
+    margin: 0 0 10px 0;
+}
+
+.info-box p:last-child {
+    margin-bottom: 0;
+}
+
+.info-box ul {
+    list-style-type: none; /* Убираем стандартные маркеры */
+    padding-left: 0;
+    margin-top: 0;
+}
+
+.info-box li {
+    margin-bottom: 10px;
+    padding-left: 20px; /* Создаем отступ для кастомного маркера */
+    position: relative; /* Нужно для позиционирования псевдо-элемента */
+}
+
+/* ИЗМЕНЕНИЕ: Рисуем свой маркер-точку, чтобы он был выровнен */
+.info-box li::before {
+    content: '•'; /* unicode для точки */
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: #3498db; /* Синий цвет, в тон полоске */
+    font-weight: bold;
 }
