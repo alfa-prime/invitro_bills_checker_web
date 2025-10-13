@@ -24,10 +24,12 @@ async def _fetch_person_id_from_api(
     }
 
     try:
+        print(f"--- [DEBUG] Отправка запроса для: {last_name} ---")  #
         response_json = await service.make_request(
             method='post',
             json=payload,
         )
+        print(f"--- [DEBUG] Получен ответ для: {last_name} ---")  #
 
         if not response_json:
             logger.error(f"Пустой или некорректный ответ от шлюза для '{last_name}'")
@@ -51,6 +53,7 @@ async def _fetch_person_id_from_api(
 
 async def fetch_person_id(service: GatewayService, data: dict) -> dict:
     person = data["person"]
+
     person_id = await _fetch_person_id_from_api(
         service=service,
         last_name=person["last_name"],
