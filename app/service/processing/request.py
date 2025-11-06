@@ -24,12 +24,10 @@ async def _fetch_person_id_from_api(
     }
 
     try:
-        print(f"--- [DEBUG] Отправка запроса для: {last_name} ---")  #
         response_json = await service.make_request(
             method='post',
             json=payload,
         )
-        print(f"--- [DEBUG] Получен ответ для: {last_name} ---")  #
 
         if not response_json:
             logger.error(f"Пустой или некорректный ответ от шлюза для '{last_name}'")
