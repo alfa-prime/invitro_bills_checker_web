@@ -1,11 +1,32 @@
-from typing import Any
 import datetime as dt
 from datetime import datetime, timedelta
+from typing import Any
+
 from dateutil.parser import parse
 
-from . import constants
+from app.core.logger_setup import logger
 from app.service.processing.tool import is_person_id_valid
+from . import constants
 from .pay_type_mapper import PAY_TYPE_IDS
+
+
+def _sanitize_float(value: Any) -> float:
+    """Безопасно конвертирует значение из Excel в число с плавающей точкой."""
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    if isinstance(value, str):
+        # 1. Заменяем запятую на точку
+        # 2. Удаляем все виды пробелов (обычные и неразрывные \xa0)
+        clean_value = value.replace(',', '.').replace('\xa0', '').strip().replace(' ', '')
+        try:
+            return float(clean_value)
+        except ValueError:
+            logger.warning(f"Не удалось конвертировать строку '{value}' в число. Установлено 0.0")
+            return 0.0
+    return 0.0
 
 
 def sanitize_for_report(data: list) -> list[dict]:
@@ -64,7 +85,6 @@ def sanitize_for_report(data: list) -> list[dict]:
             'test_report': test_report
         })
     return result
-
 
 
 def sanitize_medical_history(raw_data: dict, visit_date: str):
@@ -143,7 +163,8 @@ def sanitize_persons_tests_history(data: list) -> list:
                         try:
                             filtered_history = min(
                                 filtered_history,
-                                key=lambda record: abs(datetime.strptime(record['sort'], '%Y-%m-%d %H:%M:%S') - visit_date)
+                                key=lambda record: abs(
+                                    datetime.strptime(record['sort'], '%Y-%m-%d %H:%M:%S') - visit_date)
                             )
                         except ValueError:
                             pass
@@ -252,6 +273,7 @@ def _sanitize_name(raw_name: str) -> list[str]:
 def sanitize_raw_data(data):
     sanitized = []
     for row in data:
+        # logger.debug(row)
         visit_date, raw_birthday, inz, full_name, test_code, test_name, test_quantity, test_price = row
         last, first, middle = _sanitize_name(full_name)
         birthday = _sanitize_birthday(raw_birthday)
@@ -268,8 +290,8 @@ def sanitize_raw_data(data):
             "test_src": {
                 "code": test_code,
                 "name": test_name,
-                "quantity": test_quantity,
-                "price": float(test_price)
+                "quantity": int(_sanitize_float(test_quantity)),
+                "price": _sanitize_float(test_price)
             }
         })
     return sanitized

@@ -1,6 +1,7 @@
 from pathlib import Path
 from openpyxl import load_workbook
 from app.core.logger_setup import logger
+from datetime import date, datetime
 from . import constants
 from .pay_type_mapper import PAY_TYPE_IDS
 from .request import (
@@ -18,6 +19,13 @@ from .sanitizer import (
 )
 from app.service.gateway import GatewayService
 from app.service.processing.tool import is_person_id_valid
+
+
+#  todo: быстрый фик
+def to_ddmmyyyy(v):
+    if isinstance(v, (datetime, date)):
+        return v.strftime("%d.%m.%Y")
+    return v
 
 
 
@@ -41,7 +49,8 @@ def get_raw_data(book_path: Path, start_row: int, max_col: int, min_col: int = 2
             patient_birthday = row[0].strftime('%d.%m.%Y') if hasattr(row[0], 'strftime') else str(row[0])
         elif len(row) > 2:
             if visit_date and patient_birthday:
-                combined_row = [visit_date, patient_birthday] + row
+                combined_row = [to_ddmmyyyy(visit_date), to_ddmmyyyy(patient_birthday)] + [to_ddmmyyyy(x) for x in row]
+                # combined_row = [visit_date, patient_birthday] + row
                 row_tuple = tuple(combined_row)
                 if row_tuple not in seen_rows:
                     processed_data.append(combined_row)

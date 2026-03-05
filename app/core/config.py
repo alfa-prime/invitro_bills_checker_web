@@ -4,6 +4,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     BASE_URL: str
     GATEWAY_REQUEST_ENDPOINT: str
+    GATEWAY_SESSION_ID: str
+    GATEWAY_API_KEY: str
     TIMEOUT: float
     HEADER_ORIGIN: str
     HEADER_REFERER: str
